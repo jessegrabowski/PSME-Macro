@@ -1,0 +1,180 @@
+tryreduce
+{
+	U[], TC[];
+};
+
+block STEADY_STATE
+{
+
+	identities
+	{
+
+		A[ss] = 1;
+
+		pi[ss] = 1;
+		P_star[ss] = 1;
+
+		B[ss] = 1;
+
+		mc[ss] = 1 / (1 + psi_p);
+
+		r[ss] = 1 / beta - (1 - delta);
+		r_G[ss] = 1 / beta;
+		w[ss] = (1 - alpha) * mc[ss] ^ (1 / (1 - alpha)) * (alpha / r[ss]) ^ (alpha / (1 - alpha));
+
+        Y[ss] = (r[ss] / (r[ss] - delta * alpha * mc[ss])) ^ (sigma_C / (sigma_C + sigma_L)) *
+				(w[ss] * (w[ss] / (1 - alpha) / mc[ss]) ^ sigma_L) ^ (1 / (sigma_C + sigma_L));
+
+        I[ss] = delta * alpha * mc[ss] * Y[ss] / r[ss];
+        C[ss] = Y[ss] ^ (-sigma_L / sigma_C) * 
+			(((1 - alpha) * mc[ss]) ^ (-sigma_L) * (w[ss]) ^ (1 + sigma_L)) ^ (1 / sigma_C);
+
+        K[ss] = alpha * mc[ss] * Y[ss] / r[ss];
+        L[ss] = (1 - alpha) * mc[ss] * Y[ss] / w[ss];
+
+        U[ss] = (1 / (1 - beta)) * (C[ss] ^ (1 - sigma_C) / (1 - sigma_C) - L[ss] ^ (1 + sigma_L) / (1 + sigma_L));
+        lambda[ss] = C[ss] ^ (-sigma_C);
+
+        q[ss] = lambda[ss];
+		Q[ss] = 1;
+
+        TC[ss] = -(r[ss] * K[ss] + w[ss] * L[ss]);
+		Div[ss] = Y[ss] + TC[ss];
+
+		LHS[ss] = Y[ss] * lambda[ss] * mc[ss] / (1 - eta_p * beta);
+		RHS[ss] = Y[ss] * lambda[ss] / (1 - eta_p * beta);
+	};
+};
+
+block HOUSEHOLD
+{
+	definitions
+	{
+		u[] = (C[] ^ (1 - sigma_C) / (1 - sigma_C) - L[] ^ (1 + sigma_L) / (1 + sigma_L));
+	};
+
+	controls
+	{
+		C[], L[], I[], K[], B[];
+	};
+
+	objective
+	{
+		U[] = u[] + beta * E[][U[1]];
+	};
+
+	constraints
+	{
+		C[] + I[] + B[] / r_G[] = r[] * K[-1] + w[] * L[] + B[-1] / pi[] + Div[] : lambda[];
+		K[] = (1 - delta) * K[-1] + I[] * (1 - phi / 2 * (I[] / I[-1] - 1) ^ 2) : q[];	
+	};
+
+	identities
+	{
+		Q[] = lambda[] / q[];
+	};
+
+	calibration
+	{
+		beta  = 0.99;
+		delta = 0.035;
+		phi = 6.32;
+
+		sigma_C ~ N(loc=2.0, scale=2.0, lower=1.0) = 1.9;
+		sigma_L ~ N(loc=2.0, scale=2.0, lower=1.0) = 1.72;
+	};
+};
+
+block FIRM
+{
+    controls
+    {
+        K[-1], L[];
+    };
+
+    objective
+    {
+        TC[] = -(r[] * K[-1] + w[] * L[]);
+    };
+
+    constraints
+    {
+        Y[] = A[] * K[-1] ^ alpha * L[] ^ (1 - alpha) : mc[];
+    };
+
+	identities
+	{	
+		Div[] = Y[] + TC[];
+	};
+
+    calibration
+    {
+		alpha ~ Beta(alpha=2, beta=5) = 0.35;
+    };
+};
+
+block PRICE_SETTING
+{
+
+	identities
+	{
+		(1 + psi_p) * LHS[] = RHS[];
+		
+		LHS[] = lambda[] * Y[] * mc[] + 
+			beta * eta_p * E[][
+				pi[1] ^ ((1 + psi_p) / psi_p) * LHS[1]
+			];
+		
+		RHS[] = lambda[] * Y[] * P_star[] +
+			beta * eta_p * E[][
+				pi[1] ^ (1 / psi_p) * P_star[] / P_star[1] * RHS[1]
+			];
+
+
+	};
+
+	calibration
+	{
+		psi_p	= 0.6;
+		eta_p	= 0.9;
+	};
+
+};
+
+block PRICE_INDEX
+{
+	identities
+	{
+		1 = eta_p * pi[] ^ (1 / psi_p) + 
+				(1 - eta_p) * (1 / P_star[]) ^ (1 / psi_p);
+
+	};
+};
+
+block TECHNOLOGY_SHOCKS
+{
+    identities
+    {
+        log(A[]) = rho_A * log(A[-1]) + epsilon_A[];
+    };
+
+    shocks
+    {
+        epsilon_A[] ~ N(mean=0, sd=sigma_epsilon_A);
+    };
+
+    calibration
+    {
+		rho_A ~ Beta(mean=0.95, sd=0.04) = 0.95;
+		sigma_epsilon_A ~ Gamma(alpha=2, beta=0.1) = 0.05;
+    };
+};
+
+block EQULIBRIUM
+{
+	identities
+	{
+		pi[] = 1;
+		B[] = 0;`
+	};
+};
